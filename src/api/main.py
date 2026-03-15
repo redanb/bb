@@ -174,5 +174,8 @@ def subscribe(req: SubscribeRequest) -> dict[str, Any]:
 
 if __name__ == "__main__":
     import uvicorn
-    # Use 0.0.0.0 to bind to all interfaces
-    uvicorn.run("src.api.main:app", host="0.0.0.0", port=8000, reload=True)
+    import os
+    # Use environment-provided port or default to 8000
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("src.api.main:app", host="0.0.0.0", port=port, reload=False)
+
