@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+.secrets/
+data/*.db
+data/*.sqlite
+brain/
+logs/
+snapshot/
+node_modules/
+.DS_Store
+*.log

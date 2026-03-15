@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  # FastAPI Web Server (API Gateway)
+  api:
+    build: .
+    container_name: bugbounty-api
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+    command: python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+    restart: always
+
+  # Background Hunting Daemon (Worker)
+  worker:
+    build: .
+    container_name: bugbounty-worker
+    depends_on:
+      - api
+    command: python src/core/background_worker.py
+    restart: always
+    volumes:
+      - ./data:/app/data  # Persistent storage for sessions

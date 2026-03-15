@@ -1,0 +1,322 @@
+<!--
+Bug Bounty Co-Pilot MVP Interface
+=================================
+A single-page HTML frontend to demonstrate the API backend.
+Start the FastAPI server (`python -m uvicorn src.api.main:app`), then open this file in a browser.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bug Bounty Co-Pilot</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --border: #334155;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 1.25rem;
+            color: var(--text-main);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            background-color: var(--bg-dark);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .result-box {
+            background-color: #020617;
+            border: 1px solid var(--border);
+            padding: 16px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.875rem;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            color: var(--success);
+            min-height: 80px;
+        }
+
+        .header {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .badge {
+            background: var(--accent);
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-weight: bold;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>Bug Bounty Co-Pilot</h1>
+            <span class="badge">v4.0 Beta</span>
+        </div>
+
+        <!-- Acceptance Prediction Module -->
+        <div class="card">
+            <h2>Data Moat: Acceptance Prediction</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -10px;">Check AI database before hunting.</p>
+            
+            <label>Platform</label>
+            <select id="am-platform">
+                <option value="hackerone">HackerOne</option>
+                <option value="bugcrowd">Bugcrowd</option>
+                <option value="intigriti">Intigriti</option>
+            </select>
+
+            <label>Program ID</label>
+            <input type="text" id="am-prog" value="prog_1" placeholder="e.g. uber, paypal">
+
+            <label>Vulnerability Class</label>
+            <select id="am-vuln">
+                <option value="sqli">SQL Injection (SQLi)</option>
+                <option value="xss">Cross-Site Scripting (XSS)</option>
+                <option value="idor">Insecure Direct Object Reference (IDOR)</option>
+                <option value="ssrf">Server-Side Request Forgery (SSRF)</option>
+                <option value="other">Other</option>
+            </select>
+
+            <label>Severity</label>
+            <select id="am-sev">
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High" selected>High</option>
+                <option value="Critical">Critical</option>
+            </select>
+
+            <button onclick="predictAcceptance()">Analyze Viability</button>
+            <div class="result-box" id="am-result" style="margin-top: 15px;">Awaiting input...</div>
+        </div>
+
+        <!-- Workflow / Hunt Session -->
+        <div class="card">
+            <h2>Workflow Controller</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -10px;">Manage automated hunting state.</p>
+            
+            <label>User ID</label>
+            <input type="text" id="wf-user" value="beta_user_1">
+            
+            <button onclick="startSession()" style="margin-bottom: 10px; background-color: var(--success);">1. Start Hunting Session</button>
+            <button onclick="advanceSession()" style="margin-bottom: 10px;">2. Advance Automation Step</button>
+            <button onclick="approveGate('APPROVE')" style="background-color: var(--warning);">3. HITL: Approve Gate</button>
+            
+            <div class="result-box" id="wf-result" style="margin-top: 15px;">Session: None</div>
+            <input type="hidden" id="current-session-id" value="">
+        </div>
+
+        <!-- AI Report Linter -->
+        <div class="card full-width">
+            <h2>AI Report Linter</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -10px;">Anti-hallucination engine to validate report quality before submission.</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div>
+                    <label>Report Title</label>
+                    <input type="text" id="lint-title" value="Blind SQL Injection in Login endpoint">
+                    
+                    <label>Summary</label>
+                    <textarea id="lint-summary">The username parameter in the /api/v1/login endpoint is vulnerable to Blind SQL Injection, allowing an attacker to exfiltrate database contents.</textarea>
+                    
+                    <label>PoC Command / Logs</label>
+                    <textarea id="lint-poc">POST /api/v1/login HTTP/1.1
+Host: api.target.com
+
+{"username": "admin' WAITFOR DELAY '0:0:5'--", "password": "123"}
+-> Server response delayed by exactly 5 seconds.</textarea>
+                </div>
+                <div>
+                    <button onclick="lintReport()" style="margin-top: 22px; height: 50px;">Run Anti-Hallucination Lint</button>
+                    <div class="result-box" id="lint-result" style="margin-top: 15px; height: 185px;">Ready to lint...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost:8000/api/v1";
+
+        async function apiCall(endpoint, method, payload) {
+            try {
+                const res = await fetch(`${API_BASE}${endpoint}`, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                return JSON.stringify(data, null, 2);
+            } catch (e) {
+                return `Error connecting to API:\nMake sure uvicorn is running:\npython -m uvicorn src.api.main:app --reload`;
+            }
+        }
+
+        async function predictAcceptance() {
+            const resBox = document.getElementById('am-result');
+            resBox.innerText = "Analyzing proprietary data graph...";
+            
+            const payload = {
+                platform: document.getElementById('am-platform').value,
+                program_id: document.getElementById('am-prog').value,
+                vuln_class: document.getElementById('am-vuln').value,
+                severity: document.getElementById('am-sev').value
+            };
+            
+            resBox.innerText = await apiCall('/predict/acceptance', 'POST', payload);
+        }
+
+        async function startSession() {
+            const resBox = document.getElementById('wf-result');
+            resBox.innerText = "Starting secure session...";
+            
+            const payload = {
+                user_id: document.getElementById('wf-user').value,
+                program_id: document.getElementById('am-prog').value
+            };
+            
+            const res = await fetch(`${API_BASE}/workflow/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(r => r.json()).catch(e => ({error: "API Offline"}));
+            
+            if (res.workflow_session_id) {
+                document.getElementById('current-session-id').value = res.workflow_session_id;
+            }
+            resBox.innerText = JSON.stringify(res, null, 2);
+        }
+
+        async function advanceSession() {
+            const sessionId = document.getElementById('current-session-id').value;
+            if (!sessionId) {
+                alert("Please start a session first");
+                return;
+            }
+            const resBox = document.getElementById('wf-result');
+            resBox.innerText = "Advancing state machine...";
+            
+            resBox.innerText = await apiCall('/workflow/advance', 'POST', {session_id: sessionId});
+        }
+
+        async function approveGate(action) {
+            const sessionId = document.getElementById('current-session-id').value;
+            if (!sessionId) return alert("No active session");
+            
+            const resBox = document.getElementById('wf-result');
+            resBox.innerText = "Processing cryptographically signed manual approval...";
+            
+            resBox.innerText = await apiCall('/workflow/approve', 'POST', {
+                session_id: sessionId,
+                approval: action,
+                report_hash: "manual_override_hash"
+            });
+        }
+
+        async function lintReport() {
+            const resBox = document.getElementById('lint-result');
+            resBox.innerText = "Cross-referencing claims against evidence logs...";
+            
+            const payload = {
+                title: document.getElementById('lint-title').value,
+                summary: document.getElementById('lint-summary').value,
+                severity: "High",
+                impact: "High",
+                steps_to_reproduce: "See PoC",
+                proof_of_concept: "See logs",
+                remediation: "Patch code",
+                poc_logs: [document.getElementById('lint-poc').value]
+            };
+            
+            resBox.innerText = await apiCall('/reports/lint', 'POST', payload);
+        }
+    </script>
+</body>
+</html>
