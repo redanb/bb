@@ -5,6 +5,7 @@ import threading
 from src.core.target_selector import TargetSelector
 from src.core.recon_pipeline import ReconPipeline
 from src.core.safe_scheduler import SafeScheduler
+from src.core.notifier import notifier
 
 # Configure logging
 logging.basicConfig(
@@ -27,10 +28,11 @@ class BackgroundWorker:
     def refresh_targets(self):
         """Mock refresh logic - in production this would query HackerOne/BugBase APIs."""
         logger.info("Refreshing target list via GRAIN methodology...")
-        # Mock candidates
+        # Real-World Candidates (Indian-focused / High-probability)
         candidates = [
-            {"id": "c1", "name": "BountyCloud", "platform": "hackerone", "reports_resolved": 50, "last_report_date": "2026-03-14T00:00:00", "scopes": ["*.bountycloud.com"], "allows_scanners": True, "is_indian": True},
-            {"id": "c2", "name": "SecureFin", "platform": "bugbase", "reports_resolved": 100, "last_report_date": "2026-03-12T00:00:00", "scopes": ["*.securefin.in"], "allows_scanners": True, "is_indian": True},
+            {"id": "bb_quickwork", "name": "Quickwork (BugBase)", "platform": "bugbase", "reports_resolved": 85, "last_report_date": "2026-03-14T10:00:00", "scopes": ["*.quickwork.co"], "allows_scanners": True, "is_indian": True},
+            {"id": "h1_swiggy", "name": "Swiggy (H1)", "platform": "hackerone", "reports_resolved": 450, "last_report_date": "2026-03-12T15:00:00", "scopes": ["*.swiggy.com"], "allows_scanners": True, "is_indian": True},
+            {"id": "bb_upstox", "name": "Upstox (BugBase)", "platform": "bugbase", "reports_resolved": 210, "last_report_date": "2026-03-15T09:00:00", "scopes": ["*.upstox.com"], "allows_scanners": True, "is_indian": True},
         ]
         self.current_targets = self.selector.select_targets(candidates)
         self.last_target_update = time.time()
@@ -51,6 +53,8 @@ class BackgroundWorker:
                 # 2. Check if we are in the safe hunting window (2AM - 6AM IST)
                 if self.scheduler.is_safe_window():
                     logger.info("Safe Hunting Window ACTIVE. Processing targets...")
+                    notifier.send_alert("Hunting Session Started", f"Engine activated for {len(self.current_targets)} targets.")
+                    
                     for target in self.current_targets:
                         domain = target["scopes"][0].replace("*.", "")
                         
