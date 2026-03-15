@@ -4,5 +4,9 @@ nixPkgs = ["python311"]
 [phases.build]
 cmds = ["pip install -r requirements.txt"]
 
+[variables]
+PYTHONPATH = "."
+
 [start]
 cmd = "bash start.sh"
+

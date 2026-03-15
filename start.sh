@@ -1,5 +1,7 @@
 #!/bin/bash
+export PYTHONPATH=$PYTHONPATH:.
 echo "Starting Bug Bounty Co-Pilot God-Mode..."
+
 
 # Ensure data directory exists for local persistence
 mkdir -p data
