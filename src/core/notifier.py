@@ -28,11 +28,28 @@ class EmailNotifier:
         
         if not self.enabled:
             logger.warning("Email notifications DISABLED: Missing SMTP_USER, SMTP_PASS, or NOTIFICATION_EMAIL secrets in Railway.")
+        
+        self.last_error = None
+
+    def verify_smtp(self):
+        """Diagnostic tool to check SMTP connectivity."""
+        if not self.enabled:
+            return False, "Configuration missing (SMTP_USER/PASS/NOTIFICATION_EMAIL)"
+        
+        try:
+            server = smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=10)
+            server.starttls()
+            server.login(self.smtp_user, self.smtp_pass)
+            server.quit()
+            return True, "SMTP connection successful."
+        except Exception as e:
+            self.last_error = str(e)
+            return False, f"SMTP Error: {str(e)}"
 
     def send_alert(self, subject, message):
         if not self.enabled:
             logger.info(f"Notification (DRY RUN): {subject} - {message}")
-            return
+            return True, "Dry run successful"
 
         try:
             msg = MIMEMultipart()
@@ -42,14 +59,17 @@ class EmailNotifier:
 
             msg.attach(MIMEText(message, 'plain'))
 
-            server = smtplib.SMTP(self.smtp_server, self.smtp_port)
+            server = smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=15)
             server.starttls()
             server.login(self.smtp_user, self.smtp_pass)
             server.send_message(msg)
             server.quit()
             logger.info(f"Email alert sent successfully: {subject}")
+            return True, "Success"
         except Exception as e:
+            self.last_error = str(e)
             logger.error(f"Failed to send email alert: {str(e)}")
+            return False, str(e)
 
 # Singleton access
 notifier = EmailNotifier()

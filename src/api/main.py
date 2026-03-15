@@ -180,6 +180,14 @@ def subscribe(req: SubscribeRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=res["error"])
     return res
 
+@app.get("/api/v1/system/status")
+def get_system_status() -> dict[str, Any]:
+    return copilot.get_system_status()
+
+@app.post("/api/v1/debug/email-test")
+def test_email() -> dict[str, Any]:
+    return copilot.test_email()
+
 
 if __name__ == "__main__":
     import uvicorn

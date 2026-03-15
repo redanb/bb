@@ -19,7 +19,11 @@ from __future__ import annotations
 
 import logging
 import time
+import json
+import os
 from typing import Any
+
+from src.core.notifier import notifier
 
 from src.core.submission_blocker import SubmissionBlocker
 from src.core.workflow_engine import WorkflowEngine, WorkflowStation, WorkflowStatus
@@ -238,8 +242,39 @@ class CoPilotApp:
             "graph_stats": self.acceptance_graph.get_stats(),
         }
 
+    def get_system_status(self) -> dict[str, Any]:
+        """Get the current hunting engine status."""
+        root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+        status_file = os.path.join(root_path, "worker_status.json")
+        
+        worker_data = {"phase": "UNKNOWN", "message": "Worker status not available"}
+        if os.path.exists(status_file):
+            try:
+                with open(status_file, "r") as f:
+                    worker_data = json.load(f)
+            except Exception:
+                pass
+        
+        smtp_ok, smtp_msg = notifier.verify_smtp()
+        
+        return {
+            "worker": worker_data,
+            "notifications": {
+                "smtp_configured": notifier.enabled,
+                "smtp_healthy": smtp_ok,
+                "last_smtp_message": smtp_msg
+            },
+            "timestamp": time.time()
+        }
+
+    def test_email(self) -> dict[str, Any]:
+        """Trigger a test email."""
+        ok, msg = notifier.send_alert("System Test", "This is a diagnostic email from your Bug Bounty Co-Pilot.")
+        return {"success": ok, "message": msg}
+
     def get_health(self) -> dict[str, Any]:
         """Health check endpoint."""
+        smtp_ok, _ = notifier.verify_smtp()
         return {
             "status": "healthy",
             "modules": {
@@ -255,6 +290,7 @@ class CoPilotApp:
                 "subscription_engine": True,
                 "revenue_share": True,
                 "payment_gateway": True,
+                "notification_hub": smtp_ok
             },
             "payment_sandbox": self.payments.is_sandbox,
             "timestamp": time.time(),
