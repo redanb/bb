@@ -11,6 +11,13 @@ class EmailNotifier:
     Singleton utility to send scan alerts and bounty reports to the user.
     """
     _instance = None
+    smtp_server: str
+    smtp_port: int
+    smtp_user: str | None
+    smtp_pass: str | None
+    target_email: str | None
+    enabled: bool
+    last_error: str | None
 
     def __new__(cls):
         if cls._instance is None:
@@ -23,7 +30,7 @@ class EmailNotifier:
         self.smtp_port = int(os.environ.get("SMTP_PORT", 587))
         self.smtp_user = os.environ.get("SMTP_USER")
         self.smtp_pass = os.environ.get("SMTP_PASS")
-        self.target_email = os.environ.get("NOTIFICATION_EMAIL")
+        self.target_email = os.environ.get("TARGET_EMAIL")
         self.enabled = all([self.smtp_user, self.smtp_pass, self.target_email])
         
         if not self.enabled:
