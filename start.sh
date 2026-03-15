@@ -1,6 +1,10 @@
 #!/bin/bash
-export PYTHONPATH=$PYTHONPATH:.
+export PYTHONPATH=$PYTHONPATH:$(pwd)
+echo "Current Directory: $(pwd)"
+echo "Directory Contents:"
+ls -R | grep ":$" | head -n 20
 echo "Starting Bug Bounty Co-Pilot God-Mode..."
+
 
 
 # Ensure data directory exists for local persistence

@@ -5,9 +5,15 @@ Exposes the CoPilotApp via REST endpoints.
 Includes OpenAPI/Swagger UI.
 """
 
-from contextlib import asynccontextmanager
+import os
+import sys
 import logging
 from typing import Any
+
+# God-Mode Path Injection: Ensures 'src' is always resolvable in cloud environments
+root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+if root_path not in sys.path:
+    sys.path.insert(0, root_path)
 
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
@@ -16,6 +22,7 @@ from src.api.app import CoPilotApp
 from src.ai.report_linter import ReportContent
 
 logger = logging.getLogger(__name__)
+
 
 # Global app instance initialized on startup
 copilot: CoPilotApp = None
