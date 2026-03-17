@@ -20,6 +20,8 @@ from __future__ import annotations
 import logging
 import time
 import json
+from datetime import datetime
+from contextlib import asynccontextmanager
 import os
 from typing import Any
 
@@ -248,10 +250,18 @@ class CoPilotApp:
         status_file = os.path.join(root_path, "worker_status.json")
         
         worker_data = {"phase": "UNKNOWN", "message": "Worker status not available"}
+        heartbeat_age_seconds = None
+        
         if os.path.exists(status_file):
             try:
                 with open(status_file, "r") as f:
                     worker_data = json.load(f)
+                    if "timestamp" in worker_data:
+                        try:
+                            last_ts = datetime.fromisoformat(worker_data["timestamp"])
+                            heartbeat_age_seconds = (datetime.now() - last_ts).total_seconds()
+                        except:
+                            pass
             except Exception:
                 pass
         
@@ -259,7 +269,10 @@ class CoPilotApp:
         tg_ok, tg_msg = notifier.verify_telegram()
         
         return {
-            "worker": worker_data,
+            "worker": {
+                **worker_data,
+                "heartbeat_age_seconds": heartbeat_age_seconds
+            },
             "notifications": {
                 "smtp_configured": notifier.enabled,
                 "smtp_healthy": smtp_ok,

@@ -67,7 +67,12 @@ class EmailNotifier:
             server.quit()
             return True, f"SMTP Success on port {self.smtp_port}"
         except Exception as e1:
-            logger.warning(f"SMTP Port {self.smtp_port} failed: {e1}. Trying fallback Port 465...")
+            err_msg = str(e1)
+            logger.warning(f"SMTP Port {self.smtp_port} failed: {err_msg}. Trying fallback Port 465...")
+            
+            # Specific check for network unreachable (Errno 101)
+            if "101" in err_msg or "unreachable" in err_msg.lower():
+                return False, f"SMTP Network Gate Block (ISP/Cloud restriction): {err_msg}"
             
             # Fallback to 465 SSL/TLS if not already using it
             if self.smtp_port != 465:
@@ -78,10 +83,10 @@ class EmailNotifier:
                     return True, "SMTP Success on fallback Port 465 (SSL)"
                 except Exception as e2:
                     self.last_error = f"Primary failed: {e1}. Fallback failed: {e2}"
-                    return False, f"SMTP Network Gate Block: {e2}"
+                    return False, f"SMTP Final Failure: {e2}"
             else:
-                self.last_error = str(e1)
-                return False, f"SMTP Error: {str(e1)}"
+                self.last_error = err_msg
+                return False, f"SMTP Error: {err_msg}"
 
     def verify_telegram(self):
         if not self.telegram_enabled:
@@ -107,8 +112,8 @@ class EmailNotifier:
 
         try:
             msg = MIMEMultipart()
-            msg['From'] = self.smtp_user
-            msg['To'] = self.target_email
+            msg['From'] = str(self.smtp_user)
+            msg['To'] = str(self.target_email)
             msg['Subject'] = f"[BugBounty] {subject}"
             msg.attach(MIMEText(message, 'plain'))
 
@@ -122,7 +127,7 @@ class EmailNotifier:
             except:
                 server = smtplib.SMTP_SSL(self.smtp_server, 465, timeout=15)
 
-            server.login(self.smtp_user, self.smtp_pass)
+            server.login(str(self.smtp_user), str(self.smtp_pass))
             server.send_message(msg)
             server.quit()
             return True, "Success"

@@ -85,45 +85,50 @@ class BackgroundWorker:
                 # 2. Check if we are in the safe hunting window (2AM - 6AM IST)
                 is_safe = self.scheduler.is_safe_window() or self.practice_mode
                 
-                if is_safe:
-                    logger.info("Hunting window ACTIVE. Processing targets...")
-                    if self.practice_mode:
-                        logger.info("PRACTICE_MODE: Bypassing window check.")
-                        
-                    notifier.send_alert("Hunting Session Started", f"Engine activated for {len(self.current_targets)} targets.")
-                    
-                    for target in self.current_targets:
-                        domain = target["scopes"][0].replace("*.", "")
-                        self.update_status("HUNTING", f"Active recon and scanning on {domain}", target["name"])
-                        
-                        logger.info(f"Starting actual recon on {domain}")
-                        subdomains = self.pipeline.passive_recon(domain)
-                        
-                        for sub in subdomains:
-                            # Apply rate limit and window check for every action
-                            self.scheduler.execute_payload(sub, "active_scan", bypass_window=self.practice_mode)
+                try:
+                    if is_safe:
+                        logger.info("Hunting window ACTIVE. Processing targets...")
+                        if self.practice_mode:
+                            logger.info("PRACTICE_MODE: Bypassing window check.")
                             
-                            # Perform real-world active scan using python requests probes
-                            findings = self.pipeline.active_scan(sub)
-                            for finding in findings:
-                                is_new = self.ledger.record_finding(
-                                    target=sub,
-                                    bug_class=finding["bug_class"],
-                                    severity=finding["severity"],
-                                    evidence=finding["evidence"],
-                                    poc_log=finding["poc_log"]
-                                )
-                                if is_new:
-                                    notifier.send_alert(
-                                        f"NEW VULNERABILITY: {finding['bug_class'].upper()} on {sub}",
-                                        f"Severity: {finding['severity']}\nEvidence: {finding['evidence']}"
+                        # Send periodic heartbeat to confirm worker is alive
+                        self.update_status("ACTIVE", f"Hunting engine processing {len(self.current_targets)} targets.")
+                        
+                        for target in self.current_targets:
+                            domain = target["scopes"][0].replace("*.", "")
+                            self.update_status("HUNTING", f"Active recon and scanning on {domain}", target["name"])
+                            
+                            logger.info(f"Starting actual recon on {domain}")
+                            subdomains = self.pipeline.passive_recon(domain)
+                            
+                            for sub in subdomains:
+                                # Apply rate limit and window check for every action
+                                self.scheduler.execute_payload(sub, "active_scan", bypass_window=self.practice_mode)
+                                
+                                # Perform real-world active scan using python requests probes
+                                findings = self.pipeline.active_scan(sub)
+                                for finding in findings:
+                                    is_new = self.ledger.record_finding(
+                                        target=sub,
+                                        bug_class=finding["bug_class"],
+                                        severity=finding["severity"],
+                                        evidence=finding["evidence"],
+                                        poc_log=finding["poc_log"]
                                     )
-                            
-                else:
-                    # Not in window, sleep for 15 minutes and check again
-                    logger.info("Outside safe hunting window (2AM-6AM IST). Idling...")
-                    self.update_status("IDLING", "Outside safe hunting window (2AM-6AM IST). Engaged passive mode.")
-                    time.sleep(900) # 15 minutes
+                                    if is_new:
+                                        notifier.send_alert(
+                                            f"NEW VULNERABILITY: {finding['bug_class'].upper()} on {sub}",
+                                            f"Severity: {finding['severity']}\nEvidence: {finding['evidence']}"
+                                        )
+                    else:
+                        # Not in window, sleep for 15 minutes and check again
+                        logger.info("Outside safe hunting window (2AM-6AM IST). Idling...")
+                        self.update_status("IDLING", "Outside safe hunting window (2AM-6AM IST). Engaged passive mode.")
+                        time.sleep(900) # 15 minutes
+                except Exception as e:
+                    logger.error(f"Error in hunting loop: {e}")
+                    self.update_status("ERROR", f"Loop recovered from error: {str(e)[:100]}")
+                    time.sleep(60) # Cooling off after error
                 
                 # Preventive sleep to prevent CPU spiking in the main loop
                 time.sleep(60)
