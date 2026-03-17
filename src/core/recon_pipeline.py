@@ -17,6 +17,8 @@ class AllowedBugClasses(Enum):
     INFO_DISCLOSURE = "info_disclosure"
     SSRF = "ssrf"
     SSTI = "ssti"
+    SQLI_BLIND = "sqli_blind"  # Time-based, safe for real-world
+    OPEN_REDIRECT = "open_redirect"
 
 class ReconPipeline:
     """
@@ -29,8 +31,11 @@ class ReconPipeline:
     def __init__(self):
         self.allowed_classes = {c.value for c in AllowedBugClasses}
 
+    # Common entry-point subdomains to probe on real targets
+    REAL_WORLD_SUBDOMAINS = ["api", "app", "dev", "staging", "www", "admin", "m", "internal"]
+
     def passive_recon(self, domain: str) -> List[str]:
-        """Performs actual DNS resolution to verify target existence before active scanning."""
+        """Performs actual DNS resolution + common subdomain discovery."""
         logger.info(f"Running passive DNS resolution on {domain}")
         found_subdomains = []
         try:
@@ -38,14 +43,24 @@ class ReconPipeline:
             clean_domain = domain.replace("http://", "").replace("https://", "").split("/")[0]
             if ":" in clean_domain:
                 clean_domain = clean_domain.split(":")[0]
-                
+
+            # Always include the root domain first
             ip = socket.gethostbyname(clean_domain)
             logger.info(f"Resolved {clean_domain} to {ip}")
-            # In a real environment, we'd wrap Subfinder here. For localhost/JuiceShop practice, 
-            # we just return the base domain as the active target if it resolves.
-            found_subdomains.append(domain)
+            found_subdomains.append(f"https://{clean_domain}")
+
+            # God-Mode: Enumerate common subdomains via DNS resolution
+            for sub in self.REAL_WORLD_SUBDOMAINS:
+                candidate = f"{sub}.{clean_domain}"
+                try:
+                    sub_ip = socket.gethostbyname(candidate)
+                    logger.info(f"Found live subdomain: {candidate} -> {sub_ip}")
+                    found_subdomains.append(f"https://{candidate}")
+                except socket.gaierror:
+                    pass  # Subdomain doesn't exist, skip silently
+
         except socket.gaierror:
-            logger.warning(f"Failed to resolve {domain}")
+            logger.warning(f"Failed to resolve base domain: {domain}")
             
         return found_subdomains
 
@@ -146,6 +161,44 @@ class ReconPipeline:
                 })
         except requests.RequestException as e:
             logger.debug(f"SSTI probe failed: {e}")
+
+        # Probe 6: Time-Based Blind SQL Injection (safe, non-destructive)
+        sqli_url = f"{target_url}/rest/user/login"
+        sqli_payload = {"email": "admin' AND SLEEP(3)--", "password": "test"}
+        try:
+            logger.info(f"Probing: {sqli_url} for Blind SQLi (time-based)")
+            start_time = time.time()
+            resp = requests.post(sqli_url, json=sqli_payload, verify=False, timeout=10)
+            elapsed = time.time() - start_time
+            # If server took >2.5 seconds to respond to a login attempt, time-based SQLi likely exists
+            if elapsed >= 2.5 and resp.status_code in [200, 401, 403, 500]:
+                findings.append({
+                    "bug_class": "sqli_blind",
+                    "severity": "Critical",
+                    "evidence": f"Possible Time-Based Blind SQLi: Login endpoint delayed {elapsed:.1f}s with SLEEP(3) payload.",
+                    "poc_log": f"POST {sqli_url} body={sqli_payload}\nResponse time: {elapsed:.1f}s (expected ~0s)"
+                })
+        except requests.RequestException as e:
+            logger.debug(f"Blind SQLi probe failed: {e}")
+
+        # Probe 7: Open Redirect via common 'next' or 'redirect' parameters
+        for redirect_param in ["redirect", "next", "return", "url", "goto"]:
+            redirect_url = f"{target_url}/?{redirect_param}=https://evil.com"
+            try:
+                logger.info(f"Probing: {redirect_url} for Open Redirect")
+                resp = requests.get(redirect_url, verify=False, timeout=5, allow_redirects=False)
+                # Check if server issues a 301/302 pointing to our injected URL
+                location = resp.headers.get("Location", "")
+                if resp.status_code in [301, 302] and "evil.com" in location:
+                    findings.append({
+                        "bug_class": "open_redirect",
+                        "severity": "Medium",
+                        "evidence": f"Open Redirect via '?{redirect_param}=' parameter. Server redirected to: {location}",
+                        "poc_log": f"GET {redirect_url}\nHTTP/1.1 {resp.status_code}\nLocation: {location}"
+                    })
+                    break  # Found one, no need to check other params
+            except requests.RequestException as e:
+                logger.debug(f"Open Redirect probe failed for param '{redirect_param}': {e}")
 
         logger.info(f"Active scan complete. Found {len(findings)} issues.")
         return findings
