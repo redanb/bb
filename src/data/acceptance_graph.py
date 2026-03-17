@@ -21,11 +21,14 @@ acceptance using cross-platform triage outcome data."
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum, auto
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -117,6 +120,26 @@ class AcceptanceGraph:
         self._by_program: dict[str, list[SubmissionRecord]] = defaultdict(list)
         self._by_vuln_class: dict[VulnerabilityClass, list[SubmissionRecord]] = defaultdict(list)
         self._by_platform_vuln: dict[tuple[str, VulnerabilityClass], list[SubmissionRecord]] = defaultdict(list)
+        
+        # Load proprietary weights or fallback to degraded 'Demo' mode
+        self._logic_weights = {
+            "exact_match_base": 0.4,   # Demo mode degraded weights
+            "platform_match_base": 0.3,
+            "vuln_class_match_base": 0.2,
+            "global_avg_base": 0.1
+        }
+        
+        config_path = Path("secrets/logic_config.json")
+        if config_path.exists():
+            try:
+                with config_path.open("r", encoding="utf-8") as f:
+                    self._logic_weights.update(json.load(f))
+                logger.info("Proprietary logic weights loaded successfully.")
+            except Exception as e:
+                logger.warning(f"Failed to load logic_config.json, using Demo weights: {e}")
+        else:
+            logger.warning("logic_config.json not found! Operating in strictly degraded Demo Mode.")
+
         logger.info("AcceptanceGraph initialized.")
 
     def record(self, submission: SubmissionRecord) -> None:
@@ -158,7 +181,7 @@ class AcceptanceGraph:
         ]
 
         if len(program_records) >= 3:
-            return self._compute_prediction(program_records, confidence_base=0.9)
+            return self._compute_prediction(program_records, confidence_base=self._logic_weights["exact_match_base"])
 
         # Level 2: Platform + vuln class match
         platform_records = [
@@ -167,7 +190,7 @@ class AcceptanceGraph:
         ]
 
         if len(platform_records) >= 5:
-            return self._compute_prediction(platform_records, confidence_base=0.7)
+            return self._compute_prediction(platform_records, confidence_base=self._logic_weights["platform_match_base"])
 
         # Level 3: Vuln class match across all platforms
         vuln_records = [
@@ -176,7 +199,7 @@ class AcceptanceGraph:
         ]
 
         if len(vuln_records) >= 5:
-            return self._compute_prediction(vuln_records, confidence_base=0.5)
+            return self._compute_prediction(vuln_records, confidence_base=self._logic_weights["vuln_class_match_base"])
 
         # Level 4: Global average (low confidence)
         all_resolved = [
@@ -185,7 +208,7 @@ class AcceptanceGraph:
         ]
 
         if all_resolved:
-            return self._compute_prediction(all_resolved, confidence_base=0.2)
+            return self._compute_prediction(all_resolved, confidence_base=self._logic_weights["global_avg_base"])
 
         # No data at all
         return AcceptancePrediction(

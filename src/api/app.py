@@ -256,13 +256,17 @@ class CoPilotApp:
                 pass
         
         smtp_ok, smtp_msg = notifier.verify_smtp()
+        tg_ok, tg_msg = notifier.verify_telegram()
         
         return {
             "worker": worker_data,
             "notifications": {
                 "smtp_configured": notifier.enabled,
                 "smtp_healthy": smtp_ok,
-                "last_smtp_message": smtp_msg
+                "last_smtp_message": smtp_msg,
+                "telegram_configured": notifier.telegram_enabled,
+                "telegram_healthy": tg_ok,
+                "last_telegram_message": tg_msg
             },
             "timestamp": time.time()
         }
@@ -272,9 +276,15 @@ class CoPilotApp:
         ok, msg = notifier.send_alert("System Test", "This is a diagnostic email from your Bug Bounty Co-Pilot.")
         return {"success": ok, "message": msg}
 
+    def test_telegram(self) -> dict[str, Any]:
+        """Trigger a test telegram message."""
+        ok, msg = notifier.send_telegram("System Test: This is a diagnostic message from your Bug Bounty Co-Pilot.")
+        return {"success": ok, "message": msg}
+
     def get_health(self) -> dict[str, Any]:
         """Health check endpoint."""
         smtp_ok, _ = notifier.verify_smtp()
+        tg_ok, _ = notifier.verify_telegram()
         return {
             "status": "healthy",
             "modules": {
@@ -290,7 +300,8 @@ class CoPilotApp:
                 "subscription_engine": True,
                 "revenue_share": True,
                 "payment_gateway": True,
-                "notification_hub": smtp_ok
+                "notification_hub": smtp_ok,
+                "telegram_alert": tg_ok
             },
             "payment_sandbox": self.payments.is_sandbox,
             "timestamp": time.time(),

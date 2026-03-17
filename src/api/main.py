@@ -188,6 +188,10 @@ def get_system_status() -> dict[str, Any]:
 def test_email() -> dict[str, Any]:
     return copilot.test_email()
 
+@app.post("/api/v1/debug/telegram-test")
+def test_telegram() -> dict[str, Any]:
+    return copilot.test_telegram()
+
 
 if __name__ == "__main__":
     import uvicorn

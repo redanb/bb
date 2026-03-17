@@ -150,10 +150,11 @@ Start the FastAPI server (`python -m uvicorn src.api.main:app`), then open this 
             </div>
             <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">Real-time diagnostics from Railway Cloud Engine.</p>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px;">
                 <button onclick="getSystemStatus()" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">Refresh Status</button>
-                <button onclick="testEmail()" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">Send Test Email</button>
-                <button onclick="startPracticeMode()" style="background-color: var(--success);">Practice Mode: Run Scan</button>
+                <button onclick="testEmail()" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">Test Email</button>
+                <button onclick="testTelegram()" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">Test TG</button>
+                <button onclick="startPracticeMode()" style="background-color: var(--success);">Run Scan</button>
             </div>
             
             <div class="result-box" id="system-console" style="height: 120px; font-size: 0.75rem; color: #60a5fa;">Awaiting heartbeat...</div>
@@ -342,10 +343,22 @@ Host: api.target.com
             try {
                 const res = await fetch(`${API_BASE}/system/status`).then(r => r.json());
                 consoleBox.innerText = `[${new Date().toLocaleTimeString()}] Cloud Heartbeat Received:\n` + JSON.stringify(res, null, 2);
-                pulse.style.background = res.notifications.smtp_healthy ? "#10b981" : "#f59e0b";
+                
+                // Pulse Green if both SMTP and Telegram are healthy (if configured)
+                const smtp_ok = res.notifications.smtp_healthy || !res.notifications.smtp_configured;
+                const tg_ok = res.notifications.telegram_healthy || !res.notifications.telegram_configured;
+                
+                if (smtp_ok && tg_ok) {
+                    pulse.style.background = "#10b981";
+                    pulse.style.boxShadow = "0 0 8px #10b981";
+                } else {
+                    pulse.style.background = "#f59e0b";
+                    pulse.style.boxShadow = "0 0 8px #f59e0b";
+                }
             } catch (e) {
                 consoleBox.innerText = `[ERROR] Unable to reach Cloud API at ${API_BASE}`;
                 pulse.style.background = "#ef4444";
+                pulse.style.boxShadow = "0 0 8px #ef4444";
             }
         }
 
@@ -353,6 +366,12 @@ Host: api.target.com
             const consoleBox = document.getElementById('system-console');
             consoleBox.innerText = "Triggering secure diagnostic email...";
             consoleBox.innerText = await apiCall('/debug/email-test', 'POST', {});
+        }
+
+        async function testTelegram() {
+            const consoleBox = document.getElementById('system-console');
+            consoleBox.innerText = "Triggering Telegram bot alert...";
+            consoleBox.innerText = await apiCall('/debug/telegram-test', 'POST', {});
         }
 
         async function startPracticeMode() {

@@ -26,6 +26,21 @@ This shows the true "hunter terminal" experience, completely connected to your l
 
 ---
 
+## Phase 1.5: Real-World Detection Engine (Integrated)
+The system has been upgraded from "Simulation Only" to "Live Probing."
+
+**1. Active Vulnerability Probing**
+- The `ReconPipeline` now performs actual DNS resolution and HTTP probes for IDOR and info disclosure.
+- Findings are automatically written to `findings_ledger.jsonl` with local evidence logs.
+
+**2. Verify System Integrity**
+- Before any high-risk changes, run the mandatory Article 3 TDD gate:
+```bash
+python c:\Users\admin\.antigravity\master\antigravity_shell.py "python verify_task.py"
+```
+
+---
+
 ## Phase 2: Cloud Deployment (Week 1)
 You cannot launch to users if it only lives on your laptop.
 

@@ -11,3 +11,17 @@ snapshot/
 node_modules/
 .DS_Store
 *.log
+
+
+# --- AntiGravity Proprietary IP & State Protection ---
+# Prevent data moats, reports, and internal scripts from being tracked
+*.jsonl
+reports/
+worker_status.json
+evolutionary_logs.md
+scripts/
+secrets/
+verify_bot.py
+verify_task.py
+.agent/
+.antigravity/

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -48,7 +49,8 @@ class VulnerabilityFingerprint:
     @property
     def fingerprint_hash(self) -> str:
         """Unique hash for this vulnerability fingerprint."""
-        data = f"{self.target_domain}|{self.endpoint}|{self.vulnerability_class.value}|{self.parameter}"
+        salt = os.environ.get("BB_FINGERPRINT_SALT", "demo_salt_only_insecure")
+        data = f"{self.target_domain}|{self.endpoint}|{self.vulnerability_class.value}|{self.parameter}|{salt}"
         return hashlib.sha256(data.encode("utf-8")).hexdigest()[:16]
 
 
@@ -80,9 +82,13 @@ class DupPredictor:
         dup_threshold: float = 0.6,
     ):
         self._graph = acceptance_graph
-        self._dup_threshold = dup_threshold
+        try:
+            self._dup_threshold = float(os.environ.get("BB_DUP_THRESHOLD", str(dup_threshold)))
+        except ValueError:
+            self._dup_threshold = dup_threshold
+            
         self._known_fingerprints: dict[str, list[VulnerabilityFingerprint]] = {}
-        logger.info("DupPredictor initialized. Threshold: %.2f", dup_threshold)
+        logger.info("DupPredictor initialized. Threshold: %.2f", self._dup_threshold)
 
     def register_fingerprint(self, fingerprint: VulnerabilityFingerprint) -> None:
         """Register a known vulnerability fingerprint (from past submissions)."""

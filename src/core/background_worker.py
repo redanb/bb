@@ -8,6 +8,7 @@ from src.core.target_selector import TargetSelector
 from src.core.recon_pipeline import ReconPipeline
 from src.core.safe_scheduler import SafeScheduler
 from src.core.notifier import notifier
+from src.core.findings_ledger import FindingsLedger
 
 # Configure logging
 logging.basicConfig(
@@ -27,6 +28,7 @@ class BackgroundWorker:
         self.selector = TargetSelector()
         self.pipeline = ReconPipeline()
         self.scheduler = SafeScheduler()
+        self.ledger = FindingsLedger(os.path.join(root_path, "findings_ledger.jsonl"))
         self.current_targets = []
         self.last_target_update = 0.0
         self.status_file = os.path.join(root_path, "worker_status.json")
@@ -54,8 +56,8 @@ class BackgroundWorker:
         if self.practice_mode:
             logger.info("PRACTICE_MODE: Using Sandbox targets.")
             candidates = [
-                {"id": "sandbox_juice", "name": "Sandbox: Juice Shop (OWASP)", "platform": "sandbox", "reports_resolved": 10, "last_report_date": "2026-03-15T00:00:00", "scopes": ["juice-shop.herokuapp.com"], "allows_scanners": True, "is_indian": False},
-                {"id": "sandbox_bank", "name": "Sandbox: Vulnerable Bank", "platform": "sandbox", "reports_resolved": 5, "last_report_date": "2026-03-15T00:00:00", "scopes": ["vulnerable-bank.com"], "allows_scanners": True, "is_indian": False},
+                {"id": "sandbox_juice", "name": "Sandbox: Juice Shop (OWASP)", "platform": "sandbox", "reports_resolved": 10, "last_report_date": "2026-03-15T00:00:00", "scopes": ["*.juice-shop.herokuapp.com"], "allows_scanners": True, "is_indian": False},
+                {"id": "sandbox_bank", "name": "Sandbox: Vulnerable Bank", "platform": "sandbox", "reports_resolved": 5, "last_report_date": "2026-03-15T00:00:00", "scopes": ["*.vulnerable-bank.com"], "allows_scanners": True, "is_indian": False},
             ]
         else:
             # Real-World Candidates
@@ -92,15 +94,30 @@ class BackgroundWorker:
                     
                     for target in self.current_targets:
                         domain = target["scopes"][0].replace("*.", "")
-                        self.update_status("HUNTING", f"Active recon on {domain}", target["name"])
+                        self.update_status("HUNTING", f"Active recon and scanning on {domain}", target["name"])
                         
-                        logger.info(f"Starting safe recon on {domain}")
+                        logger.info(f"Starting actual recon on {domain}")
                         subdomains = self.pipeline.passive_recon(domain)
                         
                         for sub in subdomains:
                             # Apply rate limit and window check for every action
-                            # We simulate an IDOR check as it's a allowed bug class
-                            self.scheduler.execute_payload(sub, "idor")
+                            self.scheduler.execute_payload(sub, "active_scan", bypass_window=self.practice_mode)
+                            
+                            # Perform real-world active scan using python requests probes
+                            findings = self.pipeline.active_scan(sub)
+                            for finding in findings:
+                                is_new = self.ledger.record_finding(
+                                    target=sub,
+                                    bug_class=finding["bug_class"],
+                                    severity=finding["severity"],
+                                    evidence=finding["evidence"],
+                                    poc_log=finding["poc_log"]
+                                )
+                                if is_new:
+                                    notifier.send_alert(
+                                        f"NEW VULNERABILITY: {finding['bug_class'].upper()} on {sub}",
+                                        f"Severity: {finding['severity']}\nEvidence: {finding['evidence']}"
+                                    )
                             
                 else:
                     # Not in window, sleep for 15 minutes and check again
