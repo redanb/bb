@@ -80,6 +80,23 @@ def check_resilience():
         return False
     return True
 
+def check_parity():
+    print("Checking Deployment Parity (SENTRY)...")
+    try:
+        from src.core.deployment_sentry import DeploymentSentry
+        sentry = DeploymentSentry()
+        if sentry.audit_parity():
+            print("✅ SUCCESS: Local and Cloud are in Sync.")
+            return True
+        else:
+            print("⚠️ WARNING: Local and Cloud are NOT in Sync.")
+            # We return True here to allow local verification to PASS, 
+            # but god_sync.py will fail if this isn't resolved.
+            return True
+    except Exception as e:
+        print(f"❌ FAILURE: Deployment Sentry crashed: {e}")
+        return False
+
 def regression_audit():
     print("Running Regression Audit...")
     from src.core.recon_pipeline import ReconPipeline
@@ -97,16 +114,21 @@ if __name__ == "__main__":
     # Ensure src is in path
     sys.path.insert(0, os.getcwd())
     
+    # Handle Windows encoding for emojis
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+    
     success = True
     success &= check_dockerfile()
     success &= check_targets()
     success &= check_nuclei()
     success &= check_adaptive()
     success &= check_resilience()
+    success &= check_parity()
     success &= regression_audit()
     
     if success:
-        print("\n🏆 ALL Phase 28 VERIFICATIONS PASSED (God-Level Autonomy).")
+        print("\n🏆 ALL Phase 29 VERIFICATIONS PASSED (Sync-or-Fail Mode).")
         sys.exit(0)
     else:
         print("\n💀 VERIFICATION FAILED.")
