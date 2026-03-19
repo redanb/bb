@@ -24,5 +24,5 @@ COPY . .
 # Expose the ports for FastAPI
 EXPOSE 8000
 
-# The default command will be overridden by docker-compose
-CMD ["python", "src/api/main.py"]
+# The default command uses start.sh to launch both API and Worker
+CMD ["bash", "start.sh"]

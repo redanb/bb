@@ -1,0 +1,9 @@
+{
+    "ticket_id": "DELEGATE_WAF_20260319_123456",
+    "target": "test.com",
+    "hurdle_type": "WAF",
+    "details": "details",
+    "status": "QUEUED_FOR_AGENT",
+    "assigned_to": "MANUS_BOT",
+    "timestamp": "2026-03-19T12:34:56.836303"
+}
