@@ -152,5 +152,22 @@ class EmailNotifier:
         except Exception as e:
             return False, str(e)
 
+    def notify_findings(self, target, findings):
+        """Standard method used by background worker to send grouped findings."""
+        results = []
+        for f in findings:
+            subject = f"NEW FINDING: [{f['severity'].upper()}] {f['bug_class']} on {target}"
+            body = (
+                f"🎯 *Target*: {target}\n"
+                f"🐞 *Class*: {f['bug_class']}\n"
+                f"⚡ *Severity*: {f['severity']}\n"
+                f"🔗 *Evidence*: {f['evidence']}\n\n"
+                f"PoC Log:\n```\n{f.get('poc_log', 'N/A')}\n```"
+            )
+            # Use send_alert to hit both Email and Telegram
+            ok, msg = self.send_alert(subject, body)
+            results.append((ok, msg))
+        return results if results else [(False, "No findings to notify")]
+
 # Singleton access
 notifier = EmailNotifier()
